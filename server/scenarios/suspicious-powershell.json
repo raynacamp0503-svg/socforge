@@ -1,0 +1,42 @@
+{
+  "key": "suspicious-powershell",
+  "name": "Suspicious PowerShell",
+  "title": "Encoded PowerShell execution on {host} by {user}",
+  "description": "PowerShell launched with an encoded command and download-style arguments on {host}, spawned by an Office application. This pattern is consistent with a malicious document macro.",
+  "severity": "high",
+  "difficulty": "intermediate",
+  "detection": "index=sysmon process_name=powershell.exe host={host}",
+  "mitre": [
+    { "tactic": "Execution", "technique": "T1059.001", "name": "PowerShell" },
+    { "tactic": "Initial Access", "technique": "T1566.001", "name": "Spearphishing Attachment" }
+  ],
+  "objective": "Determine why PowerShell ran with suspicious arguments on {host}, identify the parent process chain, and decide whether this is malicious execution or legitimate administration.",
+  "checklist": [
+    "Run the detection query and locate the PowerShell process-creation event",
+    "Examine the command line for red flags (encoded commands, hidden window, download strings)",
+    "Identify the parent process — what launched PowerShell?",
+    "Check for follow-on activity: network connections or DNS queries from {host} right after execution",
+    "Check whether {user} is an administrator who routinely runs PowerShell",
+    "Disposition the case and recommend host isolation if malicious"
+  ],
+  "hints": [
+    "Look at the ParentImage field in the sysmon process event — PowerShell spawned by winword.exe is almost never legitimate.",
+    "The flags -enc / -w hidden / -nop are classic malicious tradecraft; admins rarely combine them.",
+    "Check sysmon EventCode 22 (DNS) from the same host in the minutes after execution — the script reached out to a suspicious domain."
+  ],
+  "expectedEvidence": [
+    "PowerShell process creation with encoded/hidden arguments",
+    "Parent process is winword.exe (Office spawning a shell)",
+    "DNS query to a suspicious domain immediately after execution",
+    "No change-management record or admin justification"
+  ],
+  "correctDisposition": "true_positive",
+  "explanation": "This is malicious execution consistent with a phishing document macro. Three independent signals converge: (1) the parent chain — winword.exe spawning powershell.exe is a top-tier detection because documents shouldn't launch shells; (2) the argument pattern — '-nop -w hidden -enc' exists to evade logging and the user's notice; (3) immediate outbound DNS to a low-reputation domain indicates a stager fetching a payload. Legitimate admin PowerShell is typically interactive, unencoded, and parented by explorer.exe or terminal apps. Correct response: isolate the host, escalate, and pull the email that delivered the document.",
+  "reportTemplate": "1. Isolate {host} from the network. 2. Retrieve and detonate the source document in a sandbox. 3. Block the callback domain {dga_domain}. 4. Search for the same document hash across the fleet. 5. Reset credentials for {user}.",
+  "events": [
+    { "offsetSec": -240, "index": "sysmon", "sourcetype": "sysmon", "event_code": "1", "host": "{host}", "user": "{user}", "process_name": "winword.exe", "severity": "info", "message": "Process Create: Image: C:\\Program Files\\Microsoft Office\\winword.exe CommandLine: winword.exe /n \"C:\\Users\\{user}\\Downloads\\Invoice_Q3_2026.docm\" ParentImage: C:\\Windows\\explorer.exe" },
+    { "offsetSec": -180, "index": "sysmon", "sourcetype": "sysmon", "event_code": "1", "host": "{host}", "user": "{user}", "process_name": "powershell.exe", "severity": "high", "message": "Process Create: Image: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe CommandLine: powershell.exe -nop -w hidden -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQA... ParentImage: C:\\Program Files\\Microsoft Office\\winword.exe", "extra": { "parent_image": "winword.exe" } },
+    { "offsetSec": -170, "index": "sysmon", "sourcetype": "sysmon", "event_code": "22", "host": "{host}", "user": "{user}", "process_name": "powershell.exe", "severity": "medium", "message": "Dns query: QueryName: {dga_domain} QueryStatus: 0", "extra": { "query": "{dga_domain}" } },
+    { "offsetSec": -160, "index": "network", "sourcetype": "firewall", "host": "FW-EDGE01", "src_ip": "{src_ip}", "dest_ip": "{c2_ip}", "severity": "medium", "message": "action=allowed proto=tcp src={src_ip} dst={c2_ip} dport=443 bytes_out=2841" }
+  ]
+}

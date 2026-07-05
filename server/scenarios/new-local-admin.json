@@ -1,0 +1,41 @@
+{
+  "key": "new-local-admin",
+  "name": "New Local Admin Created",
+  "title": "New account {new_account} created and added to Administrators on {server}",
+  "description": "Account {new_account} was created (4720) on {server} and added to the local Administrators group (4732) minutes later, outside change-management hours.",
+  "severity": "medium",
+  "difficulty": "beginner",
+  "detection": "index=windows EventCode=4732 host={server}",
+  "mitre": [
+    { "tactic": "Persistence", "technique": "T1136.001", "name": "Create Account: Local Account" },
+    { "tactic": "Privilege Escalation", "technique": "T1098", "name": "Account Manipulation" }
+  ],
+  "objective": "Determine who created {new_account}, whether the action was authorized change activity, and whether the new admin account has been used.",
+  "checklist": [
+    "Find the account-creation event (4720) and identify the creating account",
+    "Find the group-membership change (4732) adding it to Administrators",
+    "Check whether a change ticket or maintenance window explains this (simulated: check timing and creator)",
+    "Search for any logons (4624) by {new_account} since creation",
+    "Review what the creating account was doing beforehand",
+    "Disposition — persistence mechanism vs. legitimate admin work"
+  ],
+  "hints": [
+    "Search index=windows EventCode=4720 to find who created the account — note the Subject Account.",
+    "Naming matters: real service accounts follow a convention and are created by the identity team during business hours. This one was created at an odd hour by a workstation admin session.",
+    "An attacker creates a local admin as a fallback door. Even unused, it's persistence — check 4624 events for {new_account} to confirm usage either way."
+  ],
+  "expectedEvidence": [
+    "4720 account creation event with the creating subject",
+    "4732 event adding {new_account} to Administrators",
+    "Absence of change-management justification",
+    "Any logon activity by the new account"
+  ],
+  "correctDisposition": "needs_escalation",
+  "explanation": "Unsanctioned local admin creation is a classic persistence play (T1136.001) — attackers who gain a foothold create their own credentials so they survive password resets of the account they stole. The investigation hinges on authorization: legitimate account creation traces to identity/change management, follows naming conventions, and happens in maintenance windows. This one fails all three. Because the creating account may itself be compromised, the right call is escalation for a broader compromise assessment rather than quietly deleting the account — deleting it tips off the attacker and destroys evidence.",
+  "reportTemplate": "1. Do not delete {new_account} yet — preserve evidence. 2. Disable it and monitor for access attempts. 3. Investigate the creating account's session history on {server}. 4. Escalate to IR for compromise assessment of {server}.",
+  "events": [
+    { "offsetSec": -600, "index": "windows", "sourcetype": "wineventlog", "event_code": "4624", "host": "{server}", "user": "{user}", "src_ip": "{src_ip2}", "severity": "info", "message": "An account was successfully logged on. Account Name: {user} Logon Type: 10 Source Network Address: {src_ip2}" },
+    { "offsetSec": -420, "index": "windows", "sourcetype": "wineventlog", "event_code": "4720", "host": "{server}", "user": "{user}", "severity": "medium", "message": "A user account was created. New Account Name: {new_account} Subject Account Name: {user}" },
+    { "offsetSec": -300, "index": "windows", "sourcetype": "wineventlog", "event_code": "4732", "host": "{server}", "user": "{user}", "severity": "high", "message": "A member was added to a security-enabled local group. Group Name: Administrators Member: {new_account} Subject Account Name: {user}" }
+  ]
+}

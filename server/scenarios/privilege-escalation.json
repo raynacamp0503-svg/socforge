@@ -1,0 +1,42 @@
+{
+  "key": "privilege-escalation",
+  "name": "Privilege Escalation",
+  "title": "Suspicious service installation and privilege use on {server} by {user}",
+  "description": "A new service pointing to a user-writable path was installed on {server} (EventCode 7045), followed by the account {user} receiving special privileges (4672) it does not normally hold.",
+  "severity": "high",
+  "difficulty": "advanced",
+  "detection": "index=windows EventCode=7045 host={server}",
+  "mitre": [
+    { "tactic": "Privilege Escalation", "technique": "T1543.003", "name": "Create or Modify System Process: Windows Service" },
+    { "tactic": "Privilege Escalation", "technique": "T1068", "name": "Exploitation for Privilege Escalation" }
+  ],
+  "objective": "Determine whether the service installation on {server} is a privilege-escalation mechanism, and whether {user}'s new privilege level has been abused.",
+  "checklist": [
+    "Locate the 7045 service-installation event and examine the image path",
+    "Assess the service binary location — system path or user-writable directory?",
+    "Find the 4672 special-privileges event and compare against {user}'s normal entitlements",
+    "Review what ran under the elevated context afterward",
+    "Check how {user}'s session reached {server} in the first place",
+    "Disposition and recommend response"
+  ],
+  "hints": [
+    "Services installed by software deployments point to C:\\Program Files or C:\\Windows. This one points to a Temp directory — services don't belong there.",
+    "4672 fires at logon for admins. The anomaly is not the event itself, but this account receiving SeDebugPrivilege when it is a standard user account.",
+    "Standard escalation chain: land as a user, install a service that runs as SYSTEM, use the SYSTEM shell for whatever comes next. Look at the child processes of the service binary."
+  ],
+  "expectedEvidence": [
+    "7045 service installation with a user-writable image path",
+    "4672 special privileges assigned to a normally-standard account",
+    "Process activity under the elevated context",
+    "The originating session/logon for {user} on {server}"
+  ],
+  "correctDisposition": "true_positive",
+  "explanation": "This is privilege escalation via malicious service creation (T1543.003), one of the oldest and still most common Windows escalation techniques: services run as SYSTEM, so an attacker who can install one converts user-level access into full control. The forensic tells: the service image lives in a Temp folder (deployment tools never do this), the service name mimics a legitimate one with a slight misspelling, and a standard user account suddenly holds SeDebugPrivilege. From here an attacker typically dumps credentials or establishes persistence, so the host must be treated as fully compromised — rebuild rather than clean.",
+  "reportTemplate": "1. Isolate {server}. 2. Treat all credentials used on {server} since the escalation as compromised — reset them. 3. Capture the service binary from Temp for analysis. 4. Review lateral movement FROM {server} after the 4672 event. 5. Plan a rebuild of the host.",
+  "events": [
+    { "offsetSec": -700, "index": "windows", "sourcetype": "wineventlog", "event_code": "4624", "host": "{server}", "user": "{user}", "src_ip": "{src_ip}", "severity": "info", "message": "An account was successfully logged on. Account Name: {user} Logon Type: 3 Source Network Address: {src_ip}" },
+    { "offsetSec": -420, "index": "windows", "sourcetype": "wineventlog", "event_code": "7045", "host": "{server}", "user": "{user}", "severity": "high", "message": "A service was installed in the system. Service Name: WinDefendUpdtr Service File Name: C:\\Users\\{user}\\AppData\\Local\\Temp\\wdupdater.exe Service Type: user mode service Service Start Type: auto start Service Account: LocalSystem" },
+    { "offsetSec": -350, "index": "windows", "sourcetype": "wineventlog", "event_code": "4672", "host": "{server}", "user": "{user}", "severity": "high", "message": "Special privileges assigned to new logon. Account Name: {user} Privileges: SeDebugPrivilege, SeTcbPrivilege, SeImpersonatePrivilege" },
+    { "offsetSec": -300, "index": "sysmon", "sourcetype": "sysmon", "event_code": "1", "host": "{server}", "user": "SYSTEM", "process_name": "cmd.exe", "severity": "high", "message": "Process Create: Image: C:\\Windows\\System32\\cmd.exe CommandLine: cmd.exe /c whoami /priv ParentImage: C:\\Users\\{user}\\AppData\\Local\\Temp\\wdupdater.exe User: NT AUTHORITY\\SYSTEM" }
+  ]
+}

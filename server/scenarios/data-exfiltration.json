@@ -1,0 +1,41 @@
+{
+  "key": "data-exfiltration",
+  "name": "Data Exfiltration Pattern",
+  "title": "Large after-hours upload from {host} to {cloud_domain}",
+  "description": "Host {host} transferred approximately {mb} MB to unsanctioned file-sharing site {cloud_domain} at 02:00 local time, shortly after {user} accessed an unusually large number of files on SRV-FILE01.",
+  "severity": "high",
+  "difficulty": "advanced",
+  "detection": "index=proxy user={user} {cloud_domain}",
+  "mitre": [
+    { "tactic": "Exfiltration", "technique": "T1567.002", "name": "Exfiltration to Cloud Storage" },
+    { "tactic": "Collection", "technique": "T1039", "name": "Data from Network Shared Drive" }
+  ],
+  "objective": "Establish whether the large after-hours upload from {host} represents data theft, identify what data was staged, and determine if this is an insider action or a compromised account.",
+  "checklist": [
+    "Quantify the upload: destination, volume, and time of day",
+    "Verify whether {cloud_domain} is a sanctioned corporate service",
+    "Check file-share access by {user} in the hours before the upload (collection phase)",
+    "Look for staging behavior: archive creation (zip/rar) on {host}",
+    "Assess account context: is {user}'s activity pattern consistent with their role and hours?",
+    "Determine insider vs. compromised account, and disposition"
+  ],
+  "hints": [
+    "Exfiltration is a chain: collect → stage → transfer. Work backwards from the upload — search index=windows host=SRV-FILE01 user={user} for the collection phase.",
+    "Check sysmon on {host} for an archiving process (7z, rar) writing a large file shortly before the upload — staging is the strongest confirmation.",
+    "Insider vs. compromise: check for anomalous logon sources or malware indicators on {host}. Interactive local activity + no malware artifacts points toward insider; either way the response differs (HR/legal vs. IR)."
+  ],
+  "expectedEvidence": [
+    "Proxy events showing the large upload to an unsanctioned domain",
+    "Bulk file-share access preceding the upload",
+    "Archive/staging activity on the source host",
+    "Assessment of whether the account shows compromise indicators"
+  ],
+  "correctDisposition": "needs_escalation",
+  "explanation": "This shows the complete exfiltration kill chain: bulk collection from a file share (T1039), local staging into an archive, and after-hours upload to personal cloud storage (T1567.002). Volume alone is a weak signal — backups and legitimate cloud sync move gigabytes — which is why the checklist builds the chain: unsanctioned destination + preceding bulk collection + staging + off-hours timing together are compelling. Disposition is 'needs escalation' because data theft, whether by an insider or via a compromised account, mandates involvement of HR/legal/IR and evidence preservation to a forensic standard — a SOC analyst confirms and escalates, but must not confront the user or unilaterally delete anything.",
+  "reportTemplate": "1. Preserve proxy logs and the staging archive on {host} forensically. 2. Suspend {user}'s access pending review — coordinate with HR/legal first. 3. Identify exactly which files were accessed on SRV-FILE01. 4. Block {cloud_domain} for unsanctioned use. 5. Escalate to insider-risk/IR.",
+  "events": [
+    { "offsetSec": -5400, "repeat": 15, "intervalSec": 40, "index": "windows", "sourcetype": "wineventlog", "event_code": "4663", "host": "SRV-FILE01", "user": "{user}", "src_ip": "{src_ip}", "severity": "low", "message": "An attempt was made to access an object. Object Name: D:\\Shares\\Engineering\\designs_{port}.pdf Access: ReadData Account: {user}" },
+    { "offsetSec": -3600, "index": "sysmon", "sourcetype": "sysmon", "event_code": "1", "host": "{host}", "user": "{user}", "process_name": "7z.exe", "severity": "medium", "message": "Process Create: Image: C:\\Program Files\\7-Zip\\7z.exe CommandLine: 7z a C:\\Users\\{user}\\Documents\\backup_photos.7z D:\\staging\\* ParentImage: C:\\Windows\\explorer.exe" },
+    { "offsetSec": -1800, "repeat": 6, "intervalSec": 90, "index": "proxy", "sourcetype": "web_proxy", "host": "PROXY01", "user": "{user}", "src_ip": "{src_ip}", "severity": "high", "message": "POST https://{cloud_domain}/upload status=200 category=file-sharing bytes_out={mb}00000", "extra": { "url": "{cloud_domain}", "method": "POST" } }
+  ]
+}

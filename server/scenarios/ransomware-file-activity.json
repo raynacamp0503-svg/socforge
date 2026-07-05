@@ -1,0 +1,43 @@
+{
+  "key": "ransomware-file-activity",
+  "name": "Ransomware-like File Activity",
+  "title": "Mass file modification with .locked extension on {server}",
+  "description": "Over 40 file-modification events on {server} in two minutes, each renaming documents to a .locked extension, initiated by an unrecognized process under {user}'s session. A file named HOW_TO_RECOVER.txt was created in multiple directories.",
+  "severity": "critical",
+  "difficulty": "advanced",
+  "detection": "index=windows EventCode=4663 host={server} .locked",
+  "mitre": [
+    { "tactic": "Impact", "technique": "T1486", "name": "Data Encrypted for Impact" },
+    { "tactic": "Impact", "technique": "T1490", "name": "Inhibit System Recovery" }
+  ],
+  "objective": "Confirm active ransomware encryption on {server}, identify the encryption process and entry vector, and drive immediate containment — speed matters more than completeness here.",
+  "checklist": [
+    "Confirm the mass-modification pattern (rate, extension, ransom note files)",
+    "Identify the encrypting process and the account context it runs under",
+    "IMMEDIATELY recommend isolation of {server} — do not wait to finish the investigation",
+    "Check for shadow-copy deletion (vssadmin) — a hallmark that precedes encryption",
+    "Trace the entry: how did the process get onto {server}? Check logons and process history",
+    "Check whether other hosts show the same file-rename pattern",
+    "Document the timeline for the IR team"
+  ],
+  "hints": [
+    "Triage order inverts for ransomware: contain FIRST, investigate second. Every minute of analysis is another directory encrypted.",
+    "Look for a 4688/sysmon event running 'vssadmin delete shadows' shortly before the file events — attackers destroy restore points before encrypting.",
+    "Check 4624 events on {server} in the prior hour: the process arrived over an RDP session from another internal host — that host is also compromised."
+  ],
+  "expectedEvidence": [
+    "Mass 4663 file-modification events with .locked renames",
+    "Ransom note file creation across directories",
+    "Shadow copy deletion command execution",
+    "The RDP logon that delivered the payload"
+  ],
+  "correctDisposition": "needs_escalation",
+  "explanation": "Active ransomware is the one alert class where containment precedes investigation — the correct first action is isolating {server}, then investigating. The kill chain visible in the logs: interactive RDP logon from an internal host (lateral movement), shadow-copy deletion (T1490, cutting off easy recovery), then bulk encryption with ransom note drops (T1486). Disposition is 'needs escalation' rather than simply 'true positive' because a single analyst cannot own a ransomware response: it requires IR, legal, and business continuity. The lateral-movement source means at least one more host is compromised — this is an incident, not an alert.",
+  "reportTemplate": "1. ISOLATE {server} and the RDP source host immediately. 2. Preserve memory before powering anything off. 3. Activate the IR plan — this exceeds SOC-level response. 4. Verify backup integrity before any recovery attempt. 5. Do not communicate with the attacker or touch the ransom note infrastructure.",
+  "events": [
+    { "offsetSec": -900, "index": "windows", "sourcetype": "wineventlog", "event_code": "4624", "host": "{server}", "user": "{user}", "src_ip": "{src_ip2}", "severity": "info", "message": "An account was successfully logged on. Account Name: {user} Logon Type: 10 Source Network Address: {src_ip2}" },
+    { "offsetSec": -400, "index": "sysmon", "sourcetype": "sysmon", "event_code": "1", "host": "{server}", "user": "{user}", "process_name": "vssadmin.exe", "severity": "high", "message": "Process Create: Image: C:\\Windows\\System32\\vssadmin.exe CommandLine: vssadmin delete shadows /all /quiet ParentImage: C:\\Users\\{user}\\AppData\\Local\\Temp\\update_helper.exe" },
+    { "offsetSec": -300, "repeat": 40, "intervalSec": 3, "index": "windows", "sourcetype": "wineventlog", "event_code": "4663", "host": "{server}", "user": "{user}", "process_name": "update_helper.exe", "severity": "critical", "message": "An attempt was made to access an object. Object Name: D:\\Shares\\Finance\\report_{port}.xlsx.locked Access: WriteData Process: update_helper.exe" },
+    { "offsetSec": -280, "repeat": 4, "intervalSec": 25, "index": "sysmon", "sourcetype": "sysmon", "event_code": "11", "host": "{server}", "user": "{user}", "process_name": "update_helper.exe", "severity": "critical", "message": "File created: TargetFilename: D:\\Shares\\Finance\\HOW_TO_RECOVER.txt Image: update_helper.exe" }
+  ]
+}

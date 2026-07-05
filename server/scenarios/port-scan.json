@@ -1,0 +1,39 @@
+{
+  "key": "port-scan",
+  "name": "Internal Port Scan",
+  "title": "Port scan detected from {src_ip2} against {server}",
+  "description": "Firewall logged 30+ denied connections from internal host {src_ip2} against sequential ports on {server} in under a minute — consistent with network service discovery.",
+  "severity": "low",
+  "difficulty": "beginner",
+  "detection": "index=network src_ip={src_ip2} denied",
+  "mitre": [
+    { "tactic": "Discovery", "technique": "T1046", "name": "Network Service Discovery" }
+  ],
+  "objective": "Identify the source of the internal port scan against {server} and determine whether it is authorized scanning (vulnerability management) or attacker reconnaissance.",
+  "checklist": [
+    "Run the detection query and characterize the scan (ports, speed, pattern)",
+    "Identify which host owns {src_ip2} and who was logged into it",
+    "Check whether the source is a known vulnerability scanner or IT tool",
+    "Look for successful connections that followed the scan (did anything answer?)",
+    "Check for scans against other targets from the same source",
+    "Disposition — authorized scan vs. reconnaissance"
+  ],
+  "hints": [
+    "Sequential destination ports at machine speed = scanning. Search index=network src_ip={src_ip2} to see the full pattern.",
+    "Real environments have authorized scanners (Nessus, Qualys) on known IPs. This environment's scanner subnet is 10.20.9.x — is {src_ip2} in it?",
+    "Recon from a workstation IP is a red flag: workstations don't scan servers. But with no follow-on exploitation activity, this may only warrant escalation to check the workstation, not a full incident."
+  ],
+  "expectedEvidence": [
+    "Burst of denied connections across sequential ports from {src_ip2}",
+    "Source is a user workstation, not an authorized scanner",
+    "Presence or absence of follow-on connection attempts",
+    "Owner/logged-in user of the source host"
+  ],
+  "correctDisposition": "needs_escalation",
+  "explanation": "This is unauthorized network discovery from a user workstation — either a curious user running a scanning tool or, more concerning, an attacker's foothold mapping the network. Port scans themselves cause no damage, which is why the severity is low, but they are a leading indicator: recon precedes lateral movement. The disposition logic: it's not a false positive (the scan really happened, from an unauthorized source), but a lone scan without exploitation doesn't confirm compromise either — it needs escalation to examine the source workstation. In a real SOC you would also check the scan source against your VM tool's IP allowlist before spending any more time.",
+  "reportTemplate": "1. Contact the owner of the workstation at {src_ip2}. 2. Review process history on that host around scan time. 3. If no user explanation, treat the workstation as potentially compromised. 4. Verify scanner allowlists are current to reduce future noise.",
+  "events": [
+    { "offsetSec": -120, "repeat": 30, "intervalSec": 2, "index": "network", "sourcetype": "firewall", "host": "FW-CORE01", "src_ip": "{src_ip2}", "dest_ip": "{src_ip}", "severity": "low", "message": "action=denied proto=tcp src={src_ip2} dst={src_ip} dport={port} flags=SYN", "extra": { "action": "denied", "target_host": "{server}" } },
+    { "offsetSec": -50, "index": "network", "sourcetype": "firewall", "host": "FW-CORE01", "src_ip": "{src_ip2}", "dest_ip": "{src_ip}", "severity": "low", "message": "action=allowed proto=tcp src={src_ip2} dst={src_ip} dport=445 flags=SYN", "extra": { "action": "allowed", "target_host": "{server}" } }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "key": "impossible-travel",
+  "name": "Impossible Travel",
+  "title": "Impossible travel: {user} logged in from two countries in 20 minutes",
+  "description": "Account {user} authenticated from a corporate IP (United States) and then from {attacker_ip} ({country2}) 20 minutes later — physically impossible travel.",
+  "severity": "medium",
+  "difficulty": "beginner",
+  "detection": "index=auth user={user}",
+  "mitre": [
+    { "tactic": "Initial Access", "technique": "T1078", "name": "Valid Accounts" },
+    { "tactic": "Credential Access", "technique": "T1539", "name": "Steal Web Session Cookie" }
+  ],
+  "objective": "Verify whether the geographically impossible logon pair for {user} indicates account compromise, or has a benign explanation such as VPN egress or mobile carrier routing.",
+  "checklist": [
+    "Locate both logon events for {user} and note the timestamps and source IPs",
+    "Confirm the geolocation and ownership of each source IP",
+    "Rule out benign explanations: corporate VPN egress points, cloud proxy, mobile networks",
+    "Check what the foreign session did after authenticating (mailbox rules, file access)",
+    "Check for recent phishing-related events targeting {user}",
+    "Disposition and recommend session revocation if suspicious"
+  ],
+  "hints": [
+    "Search index=auth user={user} and compare the two source IPs — one is RFC1918-adjacent corporate space, one is a foreign ISP.",
+    "The classic benign cause is a VPN whose egress is geo-located abroad. Check if {attacker_ip} belongs to your VPN provider's ranges (in this environment, it does not).",
+    "Look at what the foreign session accessed — mass file access right after logon suggests a real compromise, not a geo-IP artifact."
+  ],
+  "expectedEvidence": [
+    "Two authentication events for {user} from different countries within 20 minutes",
+    "Foreign IP is not a known VPN/proxy egress",
+    "Suspicious post-logon activity from the foreign session",
+    "User confirmation (simulated) that they did not travel"
+  ],
+  "correctDisposition": "true_positive",
+  "explanation": "This is a genuine account compromise, most likely via phished or replayed credentials/session token. Impossible-travel alerts have a high false-positive rate in real SOCs (VPNs, mobile carriers, cloud proxies), which is why the checklist forces you to rule those out first. The discriminators here: the foreign IP is a residential ISP not associated with any corporate egress, and the session immediately enumerated files — behavior inconsistent with the user's normal pattern. Correct response: revoke all sessions, reset credentials, enforce MFA re-registration, and review accessed data.",
+  "reportTemplate": "1. Revoke all active sessions for {user}. 2. Force credential reset and MFA re-enrollment. 3. Review files accessed by the session from {attacker_ip}. 4. Add {attacker_ip} to the watchlist.",
+  "events": [
+    { "offsetSec": -1500, "index": "auth", "sourcetype": "sso", "host": "SSO-GW01", "user": "{user}", "src_ip": "{src_ip}", "severity": "info", "message": "Authentication success user={user} src={src_ip} geo=US/Chicago mfa=passed app=email", "extra": { "geo": "United States" } },
+    { "offsetSec": -300, "index": "auth", "sourcetype": "sso", "host": "SSO-GW01", "user": "{user}", "src_ip": "{attacker_ip}", "severity": "medium", "message": "Authentication success user={user} src={attacker_ip} geo={country2} mfa=legacy_bypass app=email", "extra": { "geo": "{country2}" } },
+    { "offsetSec": -240, "repeat": 6, "intervalSec": 15, "index": "auth", "sourcetype": "sso", "host": "SSO-GW01", "user": "{user}", "src_ip": "{attacker_ip}", "severity": "low", "message": "Resource access user={user} src={attacker_ip} resource=sharepoint action=list_files folder=/Finance", "extra": { "geo": "{country2}" } }
+  ]
+}

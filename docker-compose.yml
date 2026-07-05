@@ -1,0 +1,22 @@
+services:
+  api:
+    build: ./server
+    environment:
+      - PORT=4000
+      - DB_PATH=/data/socforge.db
+      - ALERT_MIN_SEC=120
+      - ALERT_MAX_SEC=300
+    volumes:
+      - socdata:/data
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  socdata:

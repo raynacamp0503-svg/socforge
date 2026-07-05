@@ -1,0 +1,41 @@
+{
+  "key": "suspicious-dns",
+  "name": "Suspicious DNS Activity",
+  "title": "DGA-like DNS queries from {host}",
+  "description": "Host {host} issued a series of DNS queries for random-looking domains ({dga_domain}, {dga_domain2}, ...) with mostly NXDOMAIN responses — a pattern typical of domain generation algorithms used by malware to locate C2 infrastructure.",
+  "severity": "medium",
+  "difficulty": "intermediate",
+  "detection": "index=sysmon EventCode=22 host={host}",
+  "mitre": [
+    { "tactic": "Command and Control", "technique": "T1568.002", "name": "Domain Generation Algorithms" },
+    { "tactic": "Command and Control", "technique": "T1071.004", "name": "DNS" }
+  ],
+  "objective": "Determine whether the random-looking DNS queries from {host} indicate a DGA-equipped malware infection, and identify the responsible process.",
+  "checklist": [
+    "Run the detection query and review the queried domain names",
+    "Assess the domains: entropy, TLDs, and NXDOMAIN ratio",
+    "Identify the process issuing the queries",
+    "Check whether any query resolved successfully — a resolution means live C2 contact",
+    "Look for network connections following the successful resolution",
+    "Disposition and recommend containment"
+  ],
+  "hints": [
+    "Human-typed and CDN domains are pronounceable; DGA output like {dga_domain} is high-entropy consonant soup on cheap TLDs (.top, .xyz).",
+    "Most DGA queries fail (NXDOMAIN) because the attacker only registers a few of each day's candidates — the failures ARE the signal.",
+    "One query resolved. Find it, note the IP it returned, and check firewall logs for a connection to that IP."
+  ],
+  "expectedEvidence": [
+    "Series of high-entropy domain queries from a single process",
+    "High NXDOMAIN ratio across the queries",
+    "One successful resolution followed by an outbound connection",
+    "Responsible process is not a browser or known software updater"
+  ],
+  "correctDisposition": "true_positive",
+  "explanation": "This is DGA behavior. Malware families use domain generation so defenders can't just block a static C2 domain — the implant computes hundreds of candidate domains per day and queries them until one resolves (the one the operator bothered to register). The detection signature is statistical: high-entropy names, disposable TLDs, and a burst of NXDOMAINs punctuated by rare successes. The successful resolution followed by an outbound connection confirms live C2. Note what it is NOT: browsers pre-fetching, antivirus cloud lookups, and Chrome's random-subdomain DNS probes (three queries at startup) are common benign lookalikes — process attribution separates them.",
+  "reportTemplate": "1. Isolate {host}. 2. Block the resolved domain and {c2_ip} at DNS/egress. 3. Capture the querying binary for analysis. 4. Hunt fleet-wide for queries matching the same pattern.",
+  "events": [
+    { "offsetSec": -400, "repeat": 8, "intervalSec": 20, "index": "sysmon", "sourcetype": "sysmon", "event_code": "22", "host": "{host}", "user": "{user}", "process_name": "wupdatesvc.exe", "severity": "low", "message": "Dns query: QueryName: {dga_domain2} QueryStatus: 9003 (NXDOMAIN)", "extra": { "query": "{dga_domain2}", "status": "NXDOMAIN" } },
+    { "offsetSec": -180, "index": "sysmon", "sourcetype": "sysmon", "event_code": "22", "host": "{host}", "user": "{user}", "process_name": "wupdatesvc.exe", "severity": "medium", "message": "Dns query: QueryName: {dga_domain} QueryStatus: 0 QueryResults: {c2_ip}", "extra": { "query": "{dga_domain}", "status": "resolved" } },
+    { "offsetSec": -150, "index": "network", "sourcetype": "firewall", "host": "FW-EDGE01", "src_ip": "{src_ip}", "dest_ip": "{c2_ip}", "severity": "medium", "message": "action=allowed proto=tcp src={src_ip} dst={c2_ip} dport=443 bytes_out=1204" }
+  ]
+}

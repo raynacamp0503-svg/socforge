@@ -1,0 +1,41 @@
+{
+  "key": "brute-force-login",
+  "name": "Brute-Force Login",
+  "title": "Brute-force logon activity against {user} from {attacker_ip}",
+  "description": "Over 20 failed logons (EventCode 4625) against account {user} on {host} from external IP {attacker_ip} within 4 minutes, followed by a successful logon (4624).",
+  "severity": "high",
+  "difficulty": "beginner",
+  "detection": "index=windows EventCode=4625 src_ip={attacker_ip}",
+  "mitre": [
+    { "tactic": "Credential Access", "technique": "T1110", "name": "Brute Force" },
+    { "tactic": "Initial Access", "technique": "T1078", "name": "Valid Accounts" }
+  ],
+  "objective": "Determine whether the brute-force attempt against {user} succeeded, establish the scope of the attacker's access, and decide whether this requires escalation.",
+  "checklist": [
+    "Run the detection query and confirm the volume and timing of failed logons (4625)",
+    "Identify the source IP and check whether it is internal or external",
+    "Search for a successful logon (4624) for the same account from the same source IP",
+    "Check what the account did after the successful logon (pivot: user={user})",
+    "Verify whether other accounts were targeted from the same source IP",
+    "Document findings and recommend containment (disable account / block IP)"
+  ],
+  "hints": [
+    "Failed logons are EventCode 4625; success is 4624. Try: index=windows EventCode=4625 user={user}",
+    "The key question is whether a 4624 from {attacker_ip} appears AFTER the burst of 4625s. Sort by time.",
+    "A success following a password-guessing burst means compromised credentials — this is a true positive that needs escalation for credential reset and IP blocking."
+  ],
+  "expectedEvidence": [
+    "Burst of 4625 failed logons for {user} from {attacker_ip}",
+    "Successful 4624 logon from the same external IP after the failures",
+    "Post-compromise activity by the account",
+    "Confirmation the source IP is external / not a known VPN egress"
+  ],
+  "correctDisposition": "true_positive",
+  "explanation": "This was a successful brute-force attack. The pattern to recognize: a high-frequency burst of 4625 failures for a single account from a single external IP, terminated by a 4624 success — the guess landed. Failed-only bursts are common internet noise, but a success changes everything: credentials are compromised. Correct response is escalation: disable/reset the account, block the source IP, and hunt for post-compromise activity. Key discriminator vs. false positive: locked-out users generate 4625s too, but from internal IPs, at human speed, without a foreign success.",
+  "reportTemplate": "1. Disable and reset credentials for account {user}. 2. Block {attacker_ip} at the perimeter. 3. Review all activity by {user} after the successful logon. 4. Check for MFA gaps on externally exposed authentication.",
+  "events": [
+    { "offsetSec": -280, "repeat": 22, "intervalSec": 11, "index": "windows", "sourcetype": "wineventlog", "event_code": "4625", "host": "{host}", "user": "{user}", "src_ip": "{attacker_ip}", "severity": "low", "message": "An account failed to log on. Account Name: {user} Failure Reason: Unknown user name or bad password. Logon Type: 3 Source Network Address: {attacker_ip}" },
+    { "offsetSec": -30, "index": "windows", "sourcetype": "wineventlog", "event_code": "4624", "host": "{host}", "user": "{user}", "src_ip": "{attacker_ip}", "severity": "high", "message": "An account was successfully logged on. Account Name: {user} Logon Type: 3 Source Network Address: {attacker_ip}" },
+    { "offsetSec": -10, "index": "windows", "sourcetype": "wineventlog", "event_code": "4688", "host": "{host}", "user": "{user}", "process_name": "whoami.exe", "severity": "medium", "message": "A new process has been created. New Process Name: C:\\Windows\\System32\\whoami.exe Creator Process: cmd.exe Account: {user}" }
+  ]
+}
