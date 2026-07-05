@@ -51,6 +51,7 @@ a:hover { text-decoration: underline; }
 }
 .sidebar-footer { margin-top: auto; padding: 12px 18px; font-size: 11px; color: var(--text-faint); line-height: 1.5; }
 .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: pulse 2s infinite; }
+.live-dot.paused { background: var(--medium); animation: none; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 /* ---- Main ---- */

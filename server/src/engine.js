@@ -6,6 +6,11 @@ import { runSearch } from './search.js';
 
 const SLA_MINUTES = { critical: 30, high: 60, medium: 240, low: 480 };
 
+// Live alert generation can be paused from the UI without stopping the server.
+let paused = false;
+export const isPaused = () => paused;
+export const setPaused = (v) => { paused = !!v; };
+
 const insertEvent = db.prepare(`
   INSERT INTO events (ts, index_name, sourcetype, host, "user", src_ip, dest_ip, event_code, process_name, severity, message, extra, scenario_key, alert_id)
   VALUES (@ts, @index_name, @sourcetype, @host, @user, @src_ip, @dest_ip, @event_code, @process_name, @severity, @message, @extra, @scenario_key, @alert_id)
@@ -186,7 +191,7 @@ export function startEngine() {
 
   const fire = () => {
     const scs = getScenarios();
-    if (scs.length) {
+    if (scs.length && !paused) {
       try {
         const { caseId } = triggerScenario(pick(scs).key);
         console.log(`[engine] Fired live scenario -> case #${caseId}`);
@@ -200,6 +205,7 @@ export function startEngine() {
 
   // Saved-detection runner: evaluate enabled detections every 60s with a 10-min cooldown.
   setInterval(() => {
+    if (paused) return;
     const now = Date.now();
     for (const det of db.prepare('SELECT * FROM detections WHERE enabled = 1').all()) {
       if (det.last_fired && now - det.last_fired < 10 * 60 * 1000) continue;

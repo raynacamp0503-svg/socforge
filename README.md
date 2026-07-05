@@ -47,6 +47,8 @@ npm run dev
 
 Open http://localhost:5173. On first run the server backfills 24 hours of noise events and seeds 4 incidents (one pre-completed as an example report). The first **live** alert fires ~25 seconds after startup, then every 2–5 minutes (tune with `ALERT_MIN_SEC` / `ALERT_MAX_SEC`).
 
+**Pausing:** the ⏸ button in the sidebar pauses live alert generation (and saved-detection firing) without stopping the app — background noise keeps flowing so searches stay realistic. Nothing runs when the server is stopped: alerts never accumulate while the app is off, and all your cases and scores persist in the database between sessions.
+
 ---
 
 ## Training Coach (beginner mode)

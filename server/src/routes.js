@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { db, jparse } from './db.js';
 import { runSearch } from './search.js';
 import { getScenarios } from './scenarios.js';
-import { triggerScenario, trainingFor, computeScore, generateReport } from './engine.js';
+import { triggerScenario, trainingFor, computeScore, generateReport, isPaused, setPaused } from './engine.js';
 import { broadcast } from './sse.js';
 
 export const router = Router();
@@ -23,6 +23,15 @@ function shapeCase(row) {
     createdAt: row.created_at, closedAt: row.closed_at,
   };
 }
+
+// ---------- Engine control ----------
+router.get('/engine/status', (req, res) => res.json({ paused: isPaused() }));
+
+router.post('/engine/pause', (req, res) => {
+  setPaused(req.body?.paused);
+  broadcast('engine', { paused: isPaused() });
+  res.json({ paused: isPaused() });
+});
 
 // ---------- Search ----------
 router.get('/search', (req, res) => {

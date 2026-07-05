@@ -14,10 +14,20 @@ function Shell() {
   const { refreshKey } = useLive();
   const coach = useCoach();
   const [openCount, setOpenCount] = useState(0);
+  const [paused, setPaused] = useState(false);
 
   useEffect(() => {
     api.cases().then((cs) => setOpenCount(cs.filter((c) => c.status !== 'closed').length)).catch(() => {});
   }, [refreshKey]);
+
+  useEffect(() => {
+    api.engineStatus().then((s) => setPaused(s.paused)).catch(() => {});
+  }, []);
+
+  const togglePause = async () => {
+    const r = await api.setPaused(!paused);
+    setPaused(r.paused);
+  };
 
   const links = [
     { to: '/', label: 'Dashboard', icon: '◧' },
@@ -43,8 +53,11 @@ function Shell() {
         <button className={`coach-toggle${coach.enabled ? ' on' : ''}`} onClick={coach.toggle}>
           🎓 Training Coach: {coach.enabled ? 'ON' : 'OFF'}
         </button>
+        <button className={`coach-toggle${paused ? '' : ' on'}`} onClick={togglePause} title="Pause or resume live alert generation — background noise keeps flowing, your data is untouched">
+          {paused ? '▶ Resume live alerts' : '⏸ Pause live alerts'}
+        </button>
         <div className="sidebar-footer">
-          <div><span className="live-dot" />Live telemetry active</div>
+          <div><span className={`live-dot${paused ? ' paused' : ''}`} />{paused ? 'Live alerts paused' : 'Live telemetry active'}</div>
           <div className="mt">Simulated environment.<br />All log data is synthetic — defensive training only.</div>
         </div>
       </nav>

@@ -45,4 +45,6 @@ export const api = {
   deleteDetection: (id: number) =>
     post(`/api/detections/${id}`, undefined, 'DELETE').then((r) => j<{ ok: boolean }>(r)),
   portfolio: () => fetch('/api/portfolio').then((r) => j<PortfolioData>(r)),
+  engineStatus: () => fetch('/api/engine/status').then((r) => j<{ paused: boolean }>(r)),
+  setPaused: (paused: boolean) => post('/api/engine/pause', { paused }).then((r) => j<{ paused: boolean }>(r)),
 };
