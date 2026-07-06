@@ -20,18 +20,35 @@ A full-stack, self-hosted SOC training range that looks and works like a modern 
 
 ## Quick Start
 
-### Option A — Docker (recommended for demos)
+### Step 0 — Download the project
+
+Either clone with git:
+
+```bash
+git clone https://github.com/raynacamp0503-svg/socforge.git
+cd socforge
+```
+
+…or, with no git installed: click the green **Code** button at the top of this page → **Download ZIP** → extract it anywhere → open a terminal in the extracted folder.
+
+### Option A — Docker (easiest: one command)
+
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/) (free).
 
 ```bash
 docker compose up --build
-# open http://localhost:8080
+# then open http://localhost:8080
 ```
 
 The SQLite database persists in the `socdata` volume. `docker compose down -v` resets everything.
 
-### Option B — Local development
+### Option B — Run with Node.js
 
-Requires **Node.js 22.13+** (uses the built-in `node:sqlite` module).
+Requires [Node.js](https://nodejs.org) **22.13 or newer** (uses the built-in `node:sqlite` module — check with `node --version`).
+
+**Windows shortcut:** after installing Node, just double-click **`start-socforge.cmd`** in the project folder. It starts both servers and opens your browser. Done.
+
+Manually (any OS):
 
 ```bash
 # Terminal 1 — API on :4000
